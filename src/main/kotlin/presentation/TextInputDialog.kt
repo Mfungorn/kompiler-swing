@@ -35,8 +35,6 @@ internal class TextInputDialog(
         add(enterButton)
         setSize(300, 150)
 
-//        defaultCloseOperation = WindowConstants.DO_NOTHING_ON_CLOSE
-
         //Ensure the text field always gets the first focus.
         addComponentListener(object : ComponentAdapter() {
             override fun componentShown(ce: ComponentEvent) {

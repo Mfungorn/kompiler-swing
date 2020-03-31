@@ -9,8 +9,8 @@ private fun start() {
         modules(appModule)
     }
 
-    val appFrame = MainView()
-    appFrame.isVisible = true
+    val appView = MainView()
+    appView.isVisible = true
 }
 
 fun main(args: Array<String>) {

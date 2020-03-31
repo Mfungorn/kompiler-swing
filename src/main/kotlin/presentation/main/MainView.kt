@@ -5,7 +5,13 @@ import org.koin.core.inject
 import presentation.TextInputDialog
 import presentation.help.HelpView
 import service.FileService
+import utils.RedoAction
+import utils.RemoveSelectedAction
+import utils.TextLineNumber
+import utils.UndoAction
 import java.awt.Dimension
+import java.awt.GridBagConstraints
+import java.awt.GridBagLayout
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.WindowAdapter
@@ -24,18 +30,21 @@ class MainView : JFrame(), KoinComponent {
     init {
         title = "Kompiler"
 
-        layout = BoxLayout(this.contentPane, BoxLayout.Y_AXIS)
+        val panel = JPanel()
+        val gridBagLayout = GridBagLayout()
+        val constraints = GridBagConstraints()
+        panel.layout = gridBagLayout
 
-        defaultCloseOperation = EXIT_ON_CLOSE
+        defaultCloseOperation = DO_NOTHING_ON_CLOSE
         addWindowListener(object : WindowAdapter() {
-            override fun windowClosing(e: WindowEvent?) {
+            override fun windowClosing(e: WindowEvent) {
                 showConfirmationDialog(
                     content = "You may have unsaved changes. Proceed closing?",
                     onConfirm = {
                         dispose()
                     },
                     onDecline = {
-                        // TODO
+                        // do nothing
                     }
                 )
             }
@@ -51,42 +60,57 @@ class MainView : JFrame(), KoinComponent {
             val copyKetStroke = KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.CTRL_DOWN_MASK)
             val pasteKetStroke = KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_DOWN_MASK)
             val cutKetStroke = KeyStroke.getKeyStroke(KeyEvent.VK_X, InputEvent.CTRL_DOWN_MASK)
-            val selectAllKetStroke = KeyStroke.getKeyStroke(KeyEvent.VK_A, InputEvent.CTRL_DOWN_MASK)
+            val removeSelectedKetStroke = KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK)
             val undoKetStroke = KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK)
             val redoKetStroke =
                 KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
 
-            keymap.apply {
-                addActionForKeyStroke(copyKetStroke, TransferHandler.getCopyAction())
-                addActionForKeyStroke(pasteKetStroke, TransferHandler.getPasteAction())
-                addActionForKeyStroke(cutKetStroke, TransferHandler.getCutAction())
-//                addActionForKeyStroke(undoKetStroke, )
-//                addActionForKeyStroke(redoKetStroke, )
+            keymap.also {
+                it.addActionForKeyStroke(copyKetStroke, TransferHandler.getCopyAction())
+                it.addActionForKeyStroke(pasteKetStroke, TransferHandler.getPasteAction())
+                it.addActionForKeyStroke(cutKetStroke, TransferHandler.getCutAction())
+                it.addActionForKeyStroke(removeSelectedKetStroke, RemoveSelectedAction(this))
+                it.addActionForKeyStroke(undoKetStroke, UndoAction(manager))
+                it.addActionForKeyStroke(redoKetStroke, RedoAction(manager))
             }
+        }
+        val inputTextScrollPane = JScrollPane(inputTextArea).apply {
+            maximumSize = Dimension(10000, 600)
+            preferredSize = Dimension(0, 400)
+            minimumSize = Dimension(800, 400)
+            setRowHeaderView(TextLineNumber(inputTextArea))
+
+            requestFocus()
         }
 
         outputTextArea = JTextArea().apply {
             isEditable = false
             isFocusable = false
+            preferredSize = Dimension(800, 100)
+            minimumSize = Dimension(800, 100)
         }
 
         val fileMenu = JMenu("File").apply {
             add(JMenuItem("Create new").apply {
+                accelerator = KeyStroke.getKeyStroke('N', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     createFile()
                 }
             })
             add(JMenuItem("Open file").apply {
+                accelerator = KeyStroke.getKeyStroke('O', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     openFile()
                 }
             })
             add(JMenuItem("Save file").apply {
+                accelerator = KeyStroke.getKeyStroke('S', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     saveChanges()
                 }
             })
             add(JMenuItem("Save file as").apply {
+                accelerator = KeyStroke.getKeyStroke('S', InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
                 addActionListener {
                     saveFileAs()
                 }
@@ -105,38 +129,45 @@ class MainView : JFrame(), KoinComponent {
         }
         val editMenu = JMenu("Edit").apply {
             add(JMenuItem("Undo").apply {
+                accelerator = KeyStroke.getKeyStroke('Z', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     if (manager.canUndo())
                         manager.undo()
                 }
             })
             add(JMenuItem("Redo").apply {
+                accelerator = KeyStroke.getKeyStroke('Z', InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
                 addActionListener {
                     if (manager.canRedo())
                         manager.redo()
                 }
             })
             add(JMenuItem("Cut").apply {
+                accelerator = KeyStroke.getKeyStroke('X', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     inputTextArea.cut()
                 }
             })
             add(JMenuItem("Copy").apply {
+                accelerator = KeyStroke.getKeyStroke('C', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     inputTextArea.copy()
                 }
             })
             add(JMenuItem("Paste").apply {
+                accelerator = KeyStroke.getKeyStroke('V', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     inputTextArea.paste()
                 }
             })
             add(JMenuItem("Remove").apply {
+                accelerator = KeyStroke.getKeyStroke('D', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     inputTextArea.replaceSelection("")
                 }
             })
             add(JMenuItem("Select All").apply {
+                accelerator = KeyStroke.getKeyStroke('A', InputEvent.CTRL_DOWN_MASK)
                 addActionListener {
                     inputTextArea.selectAll()
                 }
@@ -221,8 +252,8 @@ class MainView : JFrame(), KoinComponent {
             add(runMenu)
             add(helpMenu)
         }
-
-        val instruments = JPanel().apply {
+        val toolbar = JToolBar(JToolBar.HORIZONTAL).apply {
+            isFloatable = false
             add(JButton(
                 ImageIcon(ImageIO.read(this@MainView::class.java.getResource("/new.png")), "New file")
             ).apply {
@@ -231,8 +262,9 @@ class MainView : JFrame(), KoinComponent {
                     createFile()
                 }
             })
-            add(JButton(
-                ImageIcon(ImageIO.read(this@MainView::class.java.getResource("/open.png")), "Open file")
+            add(
+                JButton(
+                    ImageIcon(ImageIO.read(this@MainView::class.java.getResource("/open.png")), "Open file")
             ).apply {
                 preferredSize = Dimension(24, 24)
                 addActionListener {
@@ -292,12 +324,45 @@ class MainView : JFrame(), KoinComponent {
             })
         }
 
-        contentPane.apply {
-            this@MainView.jMenuBar = menuBar
-            add(instruments)
-            add(inputTextArea)
-            add(outputTextArea)
+        val textSplitPane = JSplitPane(
+            JSplitPane.VERTICAL_SPLIT,
+            inputTextScrollPane,
+            JScrollPane(outputTextArea)
+        ).apply {
+            setDividerLocation(0.3)
+            resetToPreferredSizes()
         }
+
+        jMenuBar = menuBar
+
+        constraints.apply {
+            gridx = 0
+            gridy = 0
+            gridwidth = 20
+            gridheight = 1
+            fill = GridBagConstraints.BOTH
+            weightx = 1.0
+            weighty = 0.0
+            anchor = GridBagConstraints.NORTH
+        }
+        gridBagLayout.setConstraints(toolbar, constraints)
+        panel.add(toolbar)
+
+        constraints.apply {
+            gridx = 0
+            gridy = 1
+            gridwidth = 20
+            gridheight = 19
+            fill = GridBagConstraints.BOTH
+            weightx = 1.0
+            weighty = 1.0
+            anchor = GridBagConstraints.NORTH
+        }
+        gridBagLayout.setConstraints(textSplitPane, constraints)
+        panel.add(textSplitPane)
+
+        contentPane = panel
+        pack()
 
         mainViewController.fileServiceEventsObservable
             .subscribe {
