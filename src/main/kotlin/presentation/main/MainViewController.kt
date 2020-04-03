@@ -1,5 +1,6 @@
 package presentation.main
 
+import domain.lexer.Lexer
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
 import service.FileService
@@ -21,6 +22,15 @@ class MainViewController(
             }
         }
         fileService.addFileServiceEventListener(eventListener)
+    }
+
+    fun testLexer(input: String) {
+        val lexer = Lexer()
+        try {
+            lexer.analyze(input)
+        } catch (e: Exception) {
+            errorSubject.onError(e)
+        }
     }
 
     fun createFile(filename: String, ownerWindow: Component? = null): String? {

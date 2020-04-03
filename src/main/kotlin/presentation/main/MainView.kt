@@ -218,7 +218,7 @@ class MainView : JFrame(), KoinComponent {
         val runMenu = JMenu("Run").apply {
             add(JMenuItem("Run").apply {
                 addActionListener {
-
+                    mainViewController.testLexer(inputTextArea.text)
                 }
             })
         }
