@@ -12,8 +12,8 @@ object Terminals {
 
     const val PLUS = "+"
     const val MINUS = "-"
-    const val MUL = "*"
-    const val DIV = "/"
+    const val MULTIPLE = "*"
+    const val DIVIDE = "/"
 
     const val GREATER = ">"
     const val LESSER = "<"

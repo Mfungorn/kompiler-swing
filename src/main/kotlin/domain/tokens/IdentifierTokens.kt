@@ -7,12 +7,12 @@ class Operand(
 ) : Token.Identifier(lexeme)
 
 sealed class Operator(
-    value: String
-) : Token.Identifier(value) {
+    lexeme: String
+) : Token.Identifier(lexeme) {
     object Plus : Operator(Terminals.PLUS)
     object Minus : Operator(Terminals.MINUS)
-    object Mul : Operator(Terminals.MUL)
-    object Div : Operator(Terminals.DIV)
+    object Multiple : Operator(Terminals.MULTIPLE)
+    object Division : Operator(Terminals.DIVIDE)
 
     object Greater : Operator(Terminals.GREATER)
     object Lesser : Operator(Terminals.LESSER)

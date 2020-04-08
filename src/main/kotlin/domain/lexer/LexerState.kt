@@ -14,7 +14,7 @@ sealed class LexerState(
 
     object InitialState : LexerState(mutableListOf()) {
         override fun consume(action: LexerAction): LexerState = when (action) {
-            is LexerAction.Initiate -> IfReadState(tokens)
+            is LexerAction.Initiate -> IfReadState(mutableListOf())
             is LexerAction.Terminate -> TerminalState(tokens)
             is LexerAction.EmitChar -> throw IllegalStateException()
         }
@@ -72,6 +72,7 @@ sealed class LexerState(
     ) : LexerState(tokens) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = action.char.operatorOrNull()
             ?.let {
+                tokens.add(Operand(identifier))
                 tokens.add(it)
                 ConditionReadState(tokens)
             }
@@ -143,7 +144,10 @@ sealed class LexerState(
     class EndIfReadState(tokens: MutableList<Token>, start: String) : LexerState(tokens) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = when (action.char.toUpperCase()) {
             'I' -> EndIfReadState(tokens, "END I")
-            'F' -> TerminalState(tokens)
+            'F' -> {
+                tokens.add(EndIf)
+                TerminalState(tokens)
+            }
             else -> ErrorState("Error parsing 'END IF', char: ${action.char}", tokens)
         }
     }
@@ -170,18 +174,18 @@ sealed class LexerState(
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = throw UnsupportedOperationException()
     }
 
-    internal fun Char.operatorOrNull(): Operator? = when (toString()) {
+    internal fun Char.operatorOrNull(): Operator? = when (this.toString()) {
         Terminals.PLUS -> {
             Operator.Plus
         }
         Terminals.MINUS -> {
             Operator.Minus
         }
-        Terminals.MUL -> {
-            Operator.Mul
+        Terminals.MULTIPLE -> {
+            Operator.Multiple
         }
-        Terminals.DIV -> {
-            Operator.Div
+        Terminals.DIVIDE -> {
+            Operator.Division
         }
         Terminals.GREATER -> {
             Operator.Greater

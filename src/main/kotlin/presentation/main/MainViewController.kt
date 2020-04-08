@@ -1,6 +1,7 @@
 package presentation.main
 
 import domain.lexer.Lexer
+import domain.parser.Parser
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
 import service.FileService
@@ -8,7 +9,9 @@ import java.awt.Component
 import java.io.IOException
 
 class MainViewController(
-    private val fileService: FileService
+    private val fileService: FileService,
+    private val lexer: Lexer,
+    private val parser: Parser
 ) {
     private val errorSubject: BehaviorSubject<Throwable> = BehaviorSubject.create()
     val errorObservable: Observable<Throwable> = errorSubject

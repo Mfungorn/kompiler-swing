@@ -6,10 +6,10 @@ class Lexer {
     private var state: LexerState = LexerState.InitialState
 
     fun analyze(input: String): List<Token> {
-        val chars: Sequence<Char> = input.asSequence()
+        state = LexerState.InitialState
 
         state = state.consume(LexerAction.Initiate)
-        chars.forEachIndexed { index, char ->
+        input.forEachIndexed { index, char ->
             state = state.consumeEmit(LexerAction.EmitChar(char, index))
         }
 
