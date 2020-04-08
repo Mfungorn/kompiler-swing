@@ -16,6 +16,9 @@ class MainViewController(
     private val errorSubject: BehaviorSubject<Throwable> = BehaviorSubject.create()
     val errorObservable: Observable<Throwable> = errorSubject
 
+    private val outputSubject: BehaviorSubject<String> = BehaviorSubject.create()
+    val outputObservable: Observable<String> = outputSubject
+
     val fileServiceEventsObservable: Observable<FileService.FileServiceEvent> = Observable.create {
         val eventListener = object : FileService.FileServiceEventListener {
             override fun consumeEvent(event: FileService.FileServiceEvent) {
@@ -27,10 +30,13 @@ class MainViewController(
         fileService.addFileServiceEventListener(eventListener)
     }
 
-    fun testLexer(input: String) {
-        val lexer = Lexer()
+    fun test(input: String) {
         try {
-            lexer.analyze(input)
+            val tokens = lexer.analyze(input)
+            val expr = parser.parse(tokens)
+            val interpretation = expr.interpret()
+
+            outputSubject.onNext(interpretation.value.toString())
         } catch (e: Exception) {
             errorSubject.onError(e)
         }
