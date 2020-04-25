@@ -77,6 +77,7 @@ sealed class ParserState { // todo : handle unary minus
                     this
                 }
                 is ParserAction.EmitThen -> {
+                    // todo : analyze if statement is correct
                     val postfixConditionTokens = ShuntingYard
                         .fromInfixWithoutParens(stage.tokens)
                         .toPostfix()

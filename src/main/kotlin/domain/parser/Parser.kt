@@ -7,6 +7,7 @@ class Parser {
     private var state: ParserState = ParserState.InitialParsingState
 
     fun parse(tokens: List<Token>): Expression {
+        // todo : analyze if all required tokens are mentioned
         state = ParserState.InitialParsingState
 
         tokens.forEach { token ->
