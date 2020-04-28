@@ -3,7 +3,8 @@ package domain.lexer
 import domain.tokens.*
 
 sealed class LexerState(
-    open val tokens: MutableList<Token>
+    open val tokens: MutableList<Token>,
+    val errors: MutableList<String>
 ) {
     open fun consume(action: LexerAction): LexerState = when (action) {
         is LexerAction.EmitChar -> consumeEmit(action)
@@ -12,69 +13,108 @@ sealed class LexerState(
 
     abstract fun consumeEmit(action: LexerAction.EmitChar): LexerState
 
-    object InitialState : LexerState(mutableListOf()) {
+    object InitialState : LexerState(mutableListOf(), mutableListOf()) {
         override fun consume(action: LexerAction): LexerState = when (action) {
-            is LexerAction.Initiate -> IfReadState(mutableListOf())
-            is LexerAction.Terminate -> TerminalState(tokens)
+            is LexerAction.Initiate -> IfReadState(mutableListOf(), mutableListOf(), "")
+            is LexerAction.Terminate -> TerminalState(tokens, errors)
             is LexerAction.EmitChar -> throw IllegalStateException()
         }
 
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = throw UnsupportedOperationException()
     }
 
-    class IfReadState(tokens: MutableList<Token>) : LexerState(tokens) {
+    class IfReadState(
+        tokens: MutableList<Token>,
+        errors: MutableList<String>,
+        private val start: String
+    ) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = when (action.char.toUpperCase()) {
-            'I' -> IfReadState(tokens)
-            'F' -> {
-                tokens.add(If)
-                ConditionReadState(tokens)
+            'I' -> {
+                if (start.isNotEmpty()) {
+                    errors.add(
+                        "Lexical error: " +
+                                "Expected 'IF', but got ${start + action.char}, (${action.line}:${action.index})"
+                    )
+                    IfReadState(mutableListOf(), errors, "I")
+                } else {
+                    IfReadState(tokens, errors, start + action.char.toUpperCase())
+                }
             }
-            else -> ErrorState("Lexical error: Expected 'IF', but got ${action.char} at ${action.index}", tokens)
+            'F' -> {
+                if (start == "I") {
+                    tokens.add(If)
+                    ConditionReadState(tokens, errors)
+                } else {
+                    tokens.add(If)
+                    errors.add(
+                        "Lexical error: " +
+                                "Expected 'IF', but got ${start + action.char}, (${action.line}:${action.index})"
+                    )
+                    ConditionReadState(tokens, errors)
+                }
+            }
+            else -> IfReadState(mutableListOf(), errors, action.char.toString())
         }
     }
 
-    class ConditionReadState(tokens: MutableList<Token>) : LexerState(tokens) {
+    class ConditionReadState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = action.char.operatorOrNull()
             ?.let {
                 tokens.add(it)
-                ConditionReadState(tokens)
+                ConditionReadState(tokens, errors)
             }
             ?: when {
-                action.char.isWhitespace() -> ConditionReadState(tokens)
-                action.char == '=' -> EqualsOperatorReadState(tokens)
+                action.char.isWhitespace() -> ConditionReadState(tokens, errors)
+                action.char == '=' -> EqualsOperatorReadState(tokens, errors, "=")
                 action.char.isDigit() -> IntegerIdentifierReadState(
                     tokens,
+                    errors,
                     action.char.toString(),
                     this
                 )
                 action.char.isLetter() -> LiteralIdentifierReadState(
                     tokens,
+                    errors,
                     action.char.toString(),
                     this
                 )
-                else -> ErrorState("Lexical error: Illegal symbol ${action.char} at ${action.index}", tokens)
+                else -> {
+                    errors.add(
+                        "Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})"
+                    )
+                    ConditionReadState(tokens, errors)
+                }
             }
     }
 
-    class EqualsOperatorReadState(tokens: MutableList<Token>) : LexerState(tokens) {
+    class EqualsOperatorReadState(
+        tokens: MutableList<Token>,
+        errors: MutableList<String>,
+        private val start: String
+    ) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = if (action.char == '=') {
             tokens.add(Operator.Equals)
-            ConditionReadState(tokens)
+            ConditionReadState(tokens, errors)
         } else {
-            ErrorState("Error parsing equality operator, char: ${action.char} at ${action.index}", tokens)
+            tokens.add(Operator.Equals)
+            errors.add(
+                "Lexical error: Expected '==', but got ${start + action.char}, (${action.line}:${action.index})"
+            )
+            ConditionReadState(tokens, errors)
         }
     }
 
     class IntegerIdentifierReadState(
         tokens: MutableList<Token>,
+        errors: MutableList<String>,
         private val identifier: String,
         private val contextState: LexerState
-    ) : LexerState(tokens) {
+    ) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = action.char.operatorOrNull()
             ?.let {
                 tokens.add(Operand(identifier))
                 tokens.add(it)
-                ConditionReadState(tokens)
+                contextState
             }
             ?: when {
                 action.char.isWhitespace() -> {
@@ -83,41 +123,53 @@ sealed class LexerState(
                 }
                 action.char.isDigit() -> IntegerIdentifierReadState(
                     tokens,
+                    errors,
                     identifier + action.char,
                     contextState
                 )
-                action.char.isLetter() -> ErrorState(
-                    "Invalid identifier name: variable name can't start from number",
-                    tokens
-                )
-                else -> ErrorState("Lexical error: Error parsing integer, ${action.char} at ${action.index}", tokens)
+                action.char.isLetter() -> {
+                    tokens.add(Operand(identifier))
+                    errors.add(
+                        "Lexical error: " +
+                                "Invalid identifier name '${identifier + action.char}' " +
+                                "- variable name can't start from number, (${action.line}:${action.index})"
+                    )
+                    contextState
+                }
+                else -> {
+                    errors.add(
+                        "Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})"
+                    )
+                    contextState
+                }
             }
     }
 
     class LiteralIdentifierReadState(
         tokens: MutableList<Token>,
+        errors: MutableList<String>,
         private val identifier: String,
         private val contextState: LexerState
-    ) : LexerState(tokens) {
+    ) : LexerState(tokens, errors) {
         private fun resolveIdentifier(
             identifier: String,
             onResolve: (Token?) -> Unit
         ): LexerState = when (identifier.toUpperCase()) {
             Terminals.THEN -> {
                 onResolve(Then)
-                StatementReadState(tokens)
+                StatementReadState(tokens, errors)
             }
             Terminals.ELSEIF -> {
                 onResolve(ElseIf)
-                ConditionReadState(tokens)
+                ConditionReadState(tokens, errors)
             }
             Terminals.ELSE -> {
                 onResolve(Else)
-                StatementReadState(tokens)
+                StatementReadState(tokens, errors)
             }
             "END" -> {
                 onResolve(null)
-                EndIfReadState(tokens, identifier)
+                EndIfReadState(tokens, errors, "$identifier ")
             }
             Terminals.AND -> {
                 onResolve(Operator.And)
@@ -129,7 +181,7 @@ sealed class LexerState(
             }
             "=" -> {
                 onResolve(Operand(identifier))
-                EqualsOperatorReadState(tokens)
+                EqualsOperatorReadState(tokens, errors, "=")
             }
             else -> {
                 onResolve(Operand(identifier))
@@ -155,44 +207,59 @@ sealed class LexerState(
                 }
                 action.char.isLetterOrDigit() || action.char == '_' -> LiteralIdentifierReadState(
                     tokens,
+                    errors,
                     identifier + action.char,
                     contextState
                 )
-                else -> ErrorState("Parsing error in LiteralState, char: ${action.char}", tokens)
+                else -> {
+                    errors.add(
+                        "Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})"
+                    )
+                    contextState
+                }
             }
     }
 
-    class EndIfReadState(tokens: MutableList<Token>, start: String) : LexerState(tokens) {
+    class EndIfReadState(
+        tokens: MutableList<Token>,
+        errors: MutableList<String>,
+        private val start: String
+    ) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = when (action.char.toUpperCase()) {
-            'I' -> EndIfReadState(tokens, "END I")
+            'I' -> EndIfReadState(tokens, errors, "END I")
             'F' -> {
-                tokens.add(EndIf)
-                TerminalState(tokens)
+                if (start == "END I") {
+                    tokens.add(EndIf)
+                    TerminalState(tokens, errors)
+                } else {
+                    tokens.add(EndIf)
+                    errors.add("Lexical error: Expected 'END IF', but got ${start + "F"}, (${action.line}:${action.index})")
+                    TerminalState(tokens, errors)
+                }
             }
-            else -> ErrorState("Lexical error: Expected 'END IF', but got ${action.char} at ${action.index}", tokens)
+            else -> {
+                tokens.add(EndIf)
+                errors.add("Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})")
+                TerminalState(tokens, errors)
+            }
         }
     }
 
-    class StatementReadState(tokens: MutableList<Token>) : LexerState(tokens) {
+    class StatementReadState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = when {
-            action.char.isWhitespace() -> StatementReadState(tokens)
+            action.char.isWhitespace() -> StatementReadState(tokens, errors)
             action.char.isLetter() -> LiteralIdentifierReadState(
                 tokens,
+                errors,
                 action.char.toString(),
                 this
             )
-            else -> StatementReadState(tokens) // Skip input
+            else -> StatementReadState(tokens, errors) // Skip input
         }
     }
 
-    class TerminalState(tokens: MutableList<Token>) : LexerState(tokens) {
+    class TerminalState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {
         override fun consume(action: LexerAction): LexerState = throw UnsupportedOperationException()
-        override fun consumeEmit(action: LexerAction.EmitChar): LexerState = throw UnsupportedOperationException()
-    }
-
-    // todo : error state is not terminal - try to correct incoming lexical error
-    class ErrorState(val message: String, tokens: MutableList<Token>) : LexerState(tokens) {
-        override fun consume(action: LexerAction): LexerState = throw IllegalStateException(message)
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = throw UnsupportedOperationException()
     }
 

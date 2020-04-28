@@ -5,20 +5,27 @@ import domain.tokens.Token
 class Lexer {
     private var state: LexerState = LexerState.InitialState
 
-    fun analyze(input: String): List<Token> {
+    fun analyze(input: String): Pair<MutableList<Token>, MutableList<String>> {
         state = LexerState.InitialState
 
         state = state.consume(LexerAction.Initiate)
-        // todo : Multiline expressions are readable. Need to add line and index in line counters
-        input.forEachIndexed { index, char ->
-            /*if (char == '\n') { for example you can determine newline in this way
-                ...
-            }*/
-            state = state.consumeEmit(LexerAction.EmitChar(char, index))
+
+        var index = 1
+        var line = 1
+        input.forEach { char ->
+            state = state.consumeEmit(LexerAction.EmitChar(char, line, index))
+
+            index++
+            if (char == '\n') {
+                index = 1
+                line++
+            }
         }
 
+//        if (state !is LexerState.TerminalState) // todo analyze whole statement (i.e. tokens)
+
         return if (state is LexerState.TerminalState)
-            state.tokens
+            state.tokens to state.errors
         else
             throw IllegalStateException()
     }

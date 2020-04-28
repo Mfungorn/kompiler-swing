@@ -32,11 +32,13 @@ class MainViewController(
 
     fun test(input: String) {
         try {
-            val tokens = lexer.analyze(input)
-            val expr = parser.parse(tokens)
-            val interpretation = expr.interpret()
+            val result = lexer.analyze(input)
+            val tokens = result.first
+            val errors = result.second
+//            val expr = parser.parse(tokens)
+//            val interpretation = expr.interpret()
 
-            outputSubject.onNext(interpretation.value.toString())
+            outputSubject.onNext(errors.joinToString(separator = "\n"))
         } catch (e: Exception) {
             errorSubject.onError(e)
         }
