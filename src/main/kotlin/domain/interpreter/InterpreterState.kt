@@ -1,4 +1,4 @@
-package domain.parser
+package domain.interpreter
 
 import domain.expressions.*
 import domain.tokens.Operand
@@ -7,9 +7,9 @@ import domain.tokens.Token
 import org.koin.ext.isInt
 import java.util.*
 
-sealed class ParserState { // todo : handle unary minus
+sealed class InterpreterState { // todo : handle unary minus
     abstract var interpretation: Expression
-    abstract fun consume(action: ParserAction): ParserState
+    abstract fun consume(action: InterpreterAction): InterpreterState
 
     internal fun parseToken(token: Token, expressionStack: Stack<Expression>): Expression {
         val parsedExpression: Expression
@@ -46,21 +46,22 @@ sealed class ParserState { // todo : handle unary minus
         return parsedExpression
     }
 
-    object InitialParsingState : ParserState() {
+    object InitialInterpreterState : InterpreterState() {
         override var interpretation: Expression
             get() = throw IllegalStateException("InitialParsingState has no interpretation")
             set(value) {}
 
-        override fun consume(action: ParserAction): ParserState {
+        override fun consume(action: InterpreterAction): InterpreterState {
             return when (action) {
-                is ParserAction.EmitIf -> IfThenElseParsingState()
+                is InterpreterAction.EmitIf -> IfThenElseInterpretingState()
                 else -> throw IllegalStateException()
             }
         }
     }
 
-    class IfThenElseParsingState : ParserState() {
-        private var stage: Stage = Stage.ConditionParsingStage()
+    class IfThenElseInterpretingState : InterpreterState() {
+        private var stage: Stage =
+            Stage.ConditionInterpretingStage()
         private val expressionStack: Stack<Expression> = Stack<Expression>()
 
         private lateinit var condition: Expression
@@ -69,17 +70,18 @@ sealed class ParserState { // todo : handle unary minus
 
         override lateinit var interpretation: Expression
 
-        override fun consume(action: ParserAction): ParserState {
+        override fun consume(action: InterpreterAction): InterpreterState {
             return when (action) {
-                is ParserAction.EmitToken -> {
+                is InterpreterAction.EmitToken -> {
                     stage.tokens.add(action.token)
 
                     this
                 }
-                is ParserAction.EmitThen -> {
+                is InterpreterAction.EmitThen -> {
                     // todo : analyze if statement is correct
-                    val postfixConditionTokens = ShuntingYard
-                        .fromInfixWithoutParens(stage.tokens)
+                    val postfixConditionTokens = ShuntingYard.fromInfixWithoutParens(
+                        stage.tokens
+                    )
                         .toPostfix()
 
                     for (token in postfixConditionTokens) {
@@ -87,24 +89,26 @@ sealed class ParserState { // todo : handle unary minus
                     }
                     condition = expressionStack.pop()
 
-                    stage = Stage.PositiveStatementParsingStage()
+                    stage =
+                        Stage.PositiveStatementInterpretingStage()
 
                     this
                 }
-                is ParserAction.EmitElse -> {
+                is InterpreterAction.EmitElse -> {
                     stage.tokens
                     // todo
                     // Ignoring statements from stage.tokens
                     positiveStatement = BooleanExpression(true)
 
-                    stage = Stage.NegativeStatementParsingStage()
+                    stage =
+                        Stage.NegativeStatementInterpretingStage()
 
                     this
                 }
-                is ParserAction.EmitElseIf -> {
+                is InterpreterAction.EmitElseIf -> {
                     throw NotImplementedError()
                 }
-                is ParserAction.EmitEndIf -> {
+                is InterpreterAction.EmitEndIf -> {
                     stage.tokens
                     // todo
                     // Ignoring statements from stage.tokens
@@ -118,7 +122,7 @@ sealed class ParserState { // todo : handle unary minus
 
                     this
                 }
-                is ParserAction.EmitIf -> throw IllegalStateException()
+                is InterpreterAction.EmitIf -> throw IllegalStateException()
             }
         }
     }
@@ -126,11 +130,11 @@ sealed class ParserState { // todo : handle unary minus
     sealed class Stage(
         val tokens: MutableList<Token>
     ) {
-        class ConditionParsingStage(condition: MutableList<Token> = mutableListOf()) : Stage(condition)
-        class PositiveStatementParsingStage(positiveStatement: MutableList<Token> = mutableListOf()) :
+        class ConditionInterpretingStage(condition: MutableList<Token> = mutableListOf()) : Stage(condition)
+        class PositiveStatementInterpretingStage(positiveStatement: MutableList<Token> = mutableListOf()) :
             Stage(positiveStatement)
 
-        class NegativeStatementParsingStage(negativeStatement: MutableList<Token> = mutableListOf()) :
+        class NegativeStatementInterpretingStage(negativeStatement: MutableList<Token> = mutableListOf()) :
             Stage(negativeStatement)
     }
 }

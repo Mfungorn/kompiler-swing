@@ -1,4 +1,4 @@
-package domain.parser
+package domain.interpreter
 
 import domain.tokens.Operand
 import domain.tokens.Operator

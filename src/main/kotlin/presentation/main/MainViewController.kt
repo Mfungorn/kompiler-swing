@@ -1,17 +1,20 @@
 package presentation.main
 
+import domain.interpreter.Interpreter
 import domain.lexer.Lexer
 import domain.parser.Parser
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.subjects.BehaviorSubject
 import service.FileService
+import utils.formatToString
 import java.awt.Component
 import java.io.IOException
 
 class MainViewController(
     private val fileService: FileService,
     private val lexer: Lexer,
-    private val parser: Parser
+    private val parser: Parser,
+    private val interpreter: Interpreter
 ) {
     private val errorSubject: BehaviorSubject<Throwable> = BehaviorSubject.create()
     val errorObservable: Observable<Throwable> = errorSubject
@@ -32,13 +35,15 @@ class MainViewController(
 
     fun test(input: String) {
         try {
-            val result = lexer.analyze(input)
-            val tokens = result.first
-            val errors = result.second
-//            val expr = parser.parse(tokens)
-//            val interpretation = expr.interpret()
+            val lexerResult = lexer.analyze(input)
 
-            outputSubject.onNext(errors.joinToString(separator = "\n"))
+            val parserResult = parser.analyze(lexerResult.tokens, lexerResult.errors)
+
+            outputSubject.onNext(
+                parserResult.tokens.formatToString()
+                        + "\n"
+                        + parserResult.errors.joinToString("\n")
+            )
         } catch (e: Exception) {
             errorSubject.onError(e)
         }

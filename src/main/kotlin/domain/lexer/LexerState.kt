@@ -33,7 +33,7 @@ sealed class LexerState(
                 if (start.isNotEmpty()) {
                     errors.add(
                         "Lexical error: " +
-                                "Expected 'IF', but got ${start + action.char}, (${action.line}:${action.index})"
+                                "Expected 'IF', but got '${start + action.char}': (${action.line},${action.index})"
                     )
                     IfReadState(mutableListOf(), errors, "I")
                 } else {
@@ -48,7 +48,7 @@ sealed class LexerState(
                     tokens.add(If)
                     errors.add(
                         "Lexical error: " +
-                                "Expected 'IF', but got ${start + action.char}, (${action.line}:${action.index})"
+                                "Expected 'IF', but got ${start + action.char}: (${action.line},${action.index})"
                     )
                     ConditionReadState(tokens, errors)
                 }
@@ -80,7 +80,7 @@ sealed class LexerState(
                 )
                 else -> {
                     errors.add(
-                        "Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})"
+                        "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
                     )
                     ConditionReadState(tokens, errors)
                 }
@@ -98,7 +98,7 @@ sealed class LexerState(
         } else {
             tokens.add(Operator.Equals)
             errors.add(
-                "Lexical error: Expected '==', but got ${start + action.char}, (${action.line}:${action.index})"
+                "Lexical error: Expected '==', but got ${start + action.char}: (${action.line},${action.index})"
             )
             ConditionReadState(tokens, errors)
         }
@@ -124,7 +124,10 @@ sealed class LexerState(
                 action.char.isDigit() -> IntegerIdentifierReadState(
                     tokens,
                     errors,
-                    identifier + action.char,
+                    if (identifier == "0")
+                        action.char.toString()
+                    else
+                        identifier + action.char,
                     contextState
                 )
                 action.char.isLetter() -> {
@@ -132,13 +135,13 @@ sealed class LexerState(
                     errors.add(
                         "Lexical error: " +
                                 "Invalid identifier name '${identifier + action.char}' " +
-                                "- variable name can't start from number, (${action.line}:${action.index})"
+                                "- variable name can't start from number: (${action.line},${action.index})"
                     )
                     contextState
                 }
                 else -> {
                     errors.add(
-                        "Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})"
+                        "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
                     )
                     contextState
                 }
@@ -213,7 +216,7 @@ sealed class LexerState(
                 )
                 else -> {
                     errors.add(
-                        "Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})"
+                        "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
                     )
                     contextState
                 }
@@ -233,29 +236,46 @@ sealed class LexerState(
                     TerminalState(tokens, errors)
                 } else {
                     tokens.add(EndIf)
-                    errors.add("Lexical error: Expected 'END IF', but got ${start + "F"}, (${action.line}:${action.index})")
+                    errors.add("Lexical error: Expected 'END IF', but got ${start + "F"}: (${action.line},${action.index})")
                     TerminalState(tokens, errors)
                 }
             }
             else -> {
                 tokens.add(EndIf)
-                errors.add("Lexical error: Unresolved symbol ${action.char}, (${action.line}:${action.index})")
+                errors.add("Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})")
                 TerminalState(tokens, errors)
             }
         }
     }
 
     class StatementReadState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {
-        override fun consumeEmit(action: LexerAction.EmitChar): LexerState = when {
-            action.char.isWhitespace() -> StatementReadState(tokens, errors)
-            action.char.isLetter() -> LiteralIdentifierReadState(
-                tokens,
-                errors,
-                action.char.toString(),
-                this
-            )
-            else -> StatementReadState(tokens, errors) // Skip input
-        }
+        override fun consumeEmit(action: LexerAction.EmitChar): LexerState = action.char.operatorOrNull()
+            ?.let {
+                tokens.add(it)
+                StatementReadState(tokens, errors)
+            }
+            ?: when {
+                action.char.isWhitespace() -> StatementReadState(tokens, errors)
+                action.char == '=' -> EqualsOperatorReadState(tokens, errors, "=")
+                action.char.isLetter() -> LiteralIdentifierReadState(
+                    tokens,
+                    errors,
+                    action.char.toString(),
+                    this
+                )
+                action.char.isDigit() -> IntegerIdentifierReadState(
+                    tokens,
+                    errors,
+                    action.char.toString(),
+                    this
+                )
+                else -> {
+                    errors.add(
+                        "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
+                    )
+                    StatementReadState(tokens, errors)
+                }
+            }
     }
 
     class TerminalState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {

@@ -1,11 +1,12 @@
 package domain.lexer
 
+import domain.tokens.EndIf
 import domain.tokens.Token
 
 class Lexer {
     private var state: LexerState = LexerState.InitialState
 
-    fun analyze(input: String): Pair<MutableList<Token>, MutableList<String>> {
+    fun analyze(input: String): LexicalAnalysisResult {
         state = LexerState.InitialState
 
         state = state.consume(LexerAction.Initiate)
@@ -22,11 +23,18 @@ class Lexer {
             }
         }
 
-//        if (state !is LexerState.TerminalState) // todo analyze whole statement (i.e. tokens)
+        if (state !is LexerState.TerminalState) {
+            state = LexerState.TerminalState(
+                state.tokens.apply { add(EndIf) },
+                state.errors.apply { add("Lexical error: Missing 'END IF'") }
+            )
+        }
 
-        return if (state is LexerState.TerminalState)
-            state.tokens to state.errors
-        else
-            throw IllegalStateException()
+        return LexicalAnalysisResult(state.tokens, state.errors)
     }
+
+    data class LexicalAnalysisResult(
+        val tokens: List<Token>,
+        val errors: List<String>
+    )
 }
