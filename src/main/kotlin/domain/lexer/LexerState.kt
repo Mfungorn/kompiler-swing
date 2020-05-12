@@ -139,6 +139,10 @@ sealed class LexerState(
                     )
                     contextState
                 }
+                action.char == '=' -> {
+                    tokens.add(Operand(identifier))
+                    EqualsOperatorReadState(tokens, errors, "=")
+                }
                 else -> {
                     errors.add(
                         "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
