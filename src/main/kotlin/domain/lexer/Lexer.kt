@@ -1,6 +1,5 @@
 package domain.lexer
 
-import domain.tokens.EndIf
 import domain.tokens.Token
 
 class Lexer {
@@ -23,11 +22,10 @@ class Lexer {
             }
         }
 
+        state.consumeEmit(LexerAction.EmitChar(EOF, ++line, ++index))
+
         if (state !is LexerState.TerminalState) {
-            state = LexerState.TerminalState(
-                state.tokens.apply { add(EndIf) },
-                state.errors.apply { add("Lexical error: Missing 'END IF'") }
-            )
+            state = LexerState.TerminalState(state.tokens, state.errors)
         }
 
         return LexicalAnalysisResult(state.tokens, state.errors)
@@ -37,4 +35,8 @@ class Lexer {
         val tokens: List<Token>,
         val errors: List<String>
     )
+
+    companion object {
+        const val EOF: Char = '#'
+    }
 }

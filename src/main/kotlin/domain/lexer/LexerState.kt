@@ -45,7 +45,6 @@ sealed class LexerState(
                     tokens.add(If)
                     ConditionReadState(tokens, errors)
                 } else {
-                    tokens.add(If)
                     errors.add(
                         "Lexical error: " +
                                 "Expected 'IF', but got ${start + action.char}: (${action.line},${action.index})"
@@ -53,7 +52,7 @@ sealed class LexerState(
                     ConditionReadState(tokens, errors)
                 }
             }
-            else -> IfReadState(mutableListOf(), errors, action.char.toString())
+            else -> ConditionReadState(tokens, errors)//IfReadState(mutableListOf(), errors, action.char.toString())
         }
     }
 
@@ -143,6 +142,10 @@ sealed class LexerState(
                     tokens.add(Operand(identifier))
                     EqualsOperatorReadState(tokens, errors, "=")
                 }
+                action.char == Lexer.EOF -> {
+                    tokens.add(Operand(identifier))
+                    contextState.consumeEmit(action)
+                }
                 else -> {
                     errors.add(
                         "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
@@ -218,6 +221,13 @@ sealed class LexerState(
                     identifier + action.char,
                     contextState
                 )
+                action.char == Lexer.EOF -> {
+                    resolveIdentifier(identifier.toUpperCase()) { token ->
+                        if (token != null)
+                            tokens.add(token)
+                    }
+                    contextState.consumeEmit(action)
+                }
                 else -> {
                     errors.add(
                         "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
@@ -245,7 +255,7 @@ sealed class LexerState(
                 }
             }
             else -> {
-                tokens.add(EndIf)
+//                tokens.add(EndIf)
                 errors.add("Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})")
                 TerminalState(tokens, errors)
             }
@@ -273,6 +283,9 @@ sealed class LexerState(
                     action.char.toString(),
                     this
                 )
+                action.char == Lexer.EOF -> {
+                    TerminalState(tokens, errors)
+                }
                 else -> {
                     errors.add(
                         "Lexical error: Unresolved symbol ${action.char}: (${action.line},${action.index})"
@@ -284,7 +297,10 @@ sealed class LexerState(
 
     class TerminalState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {
         override fun consume(action: LexerAction): LexerState = throw UnsupportedOperationException()
-        override fun consumeEmit(action: LexerAction.EmitChar): LexerState = throw UnsupportedOperationException()
+        override fun consumeEmit(action: LexerAction.EmitChar): LexerState = when (action.char) {
+            Lexer.EOF -> this
+            else -> throw UnsupportedOperationException()
+        }
     }
 
     internal fun Char.operatorOrNull(): Operator? = when (this.toString()) {
