@@ -23,7 +23,10 @@ class Parser {
     private fun Result.`if`(): Result = if (currentToken is If) {
         restTokens.toResult(listOf(currentToken), errors)
     } else {
-        restTokens.toResult(listOf(If), errors + "Missing IF")
+        this.copy(
+            tokens = listOf(If),
+            errors = errors + "Missing IF"
+        )
     }
 
     private fun Result.then(): Result = if (currentToken is Then) {
@@ -57,18 +60,18 @@ class Parser {
                 .let {
                     it.copy(
                         tokens = tokens + it.tokens,
-                        errors = errors + it.errors
+                        errors = it.errors
                     )
                 }
             is Then -> // B -> C
                 cResult.copy(
                     tokens = tokens + cResult.tokens,
-                    errors = errors + cResult.errors
+                    errors = cResult.errors
                 )
             else -> { // Neutralization
                 cResult.copy(
                     tokens = tokens + cResult.tokens,
-                    errors = errors + cResult.errors
+                    errors = cResult.errors
                 )
             }
         }
@@ -85,7 +88,7 @@ class Parser {
                 .let {
                     it.copy(
                         tokens = firstAResult.tokens + next + it.tokens,
-                        errors = firstAResult.errors + it.errors
+                        errors = (firstAResult.errors + it.errors).distinct()
                     )
                 }
         } else { // Neutralization
@@ -106,15 +109,18 @@ class Parser {
                     .a()
                     .let {
                         it.copy(
-                            tokens = listOf(currentToken) + next + it.tokens,
-                            errors = errors + it.errors
+                            tokens = if (isComparisonOperand)
+                                listOf(currentToken) + next + it.tokens
+                            else
+                                tokens + currentToken + next + it.tokens,
+                            errors = it.errors
                         )
                     }
             }
             in COMPARISON_OPERATORS, in BOOLEAN_OPERATORS -> restTokens.toResult(listOf(currentToken), errors)
             is Operand -> { // Neutralization
                 if (isComparisonOperand) {
-                    restTokens.toResult(tokens + currentToken, errors)
+                    restTokens.toResult(listOf(currentToken), errors)
                 } else {
                     restTokens
                         .takeLast(restTokens.size - 1)
