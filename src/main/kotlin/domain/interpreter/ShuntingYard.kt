@@ -13,8 +13,9 @@ abstract class ShuntingYard private constructor() {
         Operator.Minus to 10,
         Operator.Multiple to 20,
         Operator.Division to 20,
-        Operator.And to 1,
-        Operator.Or to 0,
+        Operator.And to 2,
+        Operator.Or to 1,
+        Operator.Equals to 0,
         Operator.Lesser to 5,
         Operator.Greater to 5
     )

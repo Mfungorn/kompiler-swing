@@ -4,12 +4,9 @@ import domain.expressions.Expression
 import domain.tokens.*
 
 class Interpreter {
-    private var state: InterpreterState =
-        InterpreterState.InitialInterpreterState
-
     fun interpret(tokens: List<Token>): Expression {
         // todo : analyze if all required tokens are mentioned
-        state = InterpreterState.InitialInterpreterState
+        var state: InterpreterState = InterpreterState.InitialInterpreterState(tokens.contains(Else))
 
         tokens.forEach { token ->
             state = when (token) {
