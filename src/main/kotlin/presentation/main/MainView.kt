@@ -22,7 +22,7 @@ import javax.swing.undo.UndoManager
 
 
 class MainView : JFrame(), KoinComponent {
-    private val mainViewController: MainViewController by inject()
+    private val mainViewModel: MainViewModel by inject()
 
     private val inputTextArea: JTextArea
     private val outputTextArea: JTextArea
@@ -218,7 +218,7 @@ class MainView : JFrame(), KoinComponent {
         val runMenu = JMenu("Run").apply {
             add(JMenuItem("Run").apply {
                 addActionListener {
-                    mainViewController.test(inputTextArea.text)
+                    mainViewModel.test(inputTextArea.text)
                 }
             })
         }
@@ -364,19 +364,19 @@ class MainView : JFrame(), KoinComponent {
         contentPane = panel
         pack()
 
-        mainViewController.fileServiceEventsObservable
+        mainViewModel.fileServiceEventsObservable
             .subscribe {
                 when (it) {
                     is FileService.FileServiceEvent.FileChanged -> title = "Kompiler " + it.file?.absolutePath
                 }
             }
 
-        mainViewController.outputObservable
+        mainViewModel.outputObservable
             .subscribe {
                 outputTextArea.text = it
             }
 
-        mainViewController.errorObservable
+        mainViewModel.errorObservable
             .subscribe {
                 showErrorDialog(content = it.localizedMessage)
             }
@@ -389,14 +389,14 @@ class MainView : JFrame(), KoinComponent {
                 "You have unsaved changes",
                 onConfirm = {
                     showFilenameInputDialog("Create", "Create new file") {
-                        mainViewController.createFile(it, this)
+                        mainViewModel.createFile(it, this)
                     }
                 },
                 onDecline = {}
             )
         } else {
             showFilenameInputDialog("Create", "Create new file") {
-                mainViewController.createFile(it, this)
+                mainViewModel.createFile(it, this)
             }
         }
     }
@@ -407,22 +407,22 @@ class MainView : JFrame(), KoinComponent {
                 "Confirm operation",
                 "You have unsaved changes",
                 onConfirm = {
-                    inputTextArea.text = mainViewController.openFile(this) ?: inputTextArea.text
+                    inputTextArea.text = mainViewModel.openFile(this) ?: inputTextArea.text
                 },
                 onDecline = {}
             )
         } else {
-            inputTextArea.text = mainViewController.openFile(this) ?: inputTextArea.text
+            inputTextArea.text = mainViewModel.openFile(this) ?: inputTextArea.text
         }
     }
 
     private fun saveChanges() {
-        mainViewController.saveFile(inputTextArea.text, this) { saveFileAs() }
+        mainViewModel.saveFile(inputTextArea.text, this) { saveFileAs() }
     }
 
     private fun saveFileAs() {
         showFilenameInputDialog("Save As", "Save current file as") {
-            mainViewController.saveFileAs(it, inputTextArea.text, this)
+            mainViewModel.saveFileAs(it, inputTextArea.text, this)
         }
     }
 

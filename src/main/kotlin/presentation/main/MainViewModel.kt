@@ -10,7 +10,7 @@ import utils.formatToString
 import java.awt.Component
 import java.io.IOException
 
-class MainViewController(
+class MainViewModel(
     private val fileService: FileService,
     private val lexer: Lexer,
     private val parser: Parser,
@@ -39,11 +39,22 @@ class MainViewController(
 
             val parserResult = parser.analyze(lexerResult.tokens, lexerResult.errors)
 
-            outputSubject.onNext(
-                parserResult.tokens.formatToString()
-                        + "\n"
-                        + parserResult.errors.joinToString("\n")
-            )
+            val interpretationResult = interpreter
+                .interpret(parserResult.tokens)
+                .interpret()
+                .value
+
+            val output: String = if (parserResult.errors.isEmpty()) {
+                "${parserResult.tokens.formatToString()}\n" +
+                        "\nNo errors\n"
+            } else {
+                "Corrected code:\n" +
+                        "${parserResult.tokens.formatToString()}\n" +
+                        "\nErrors:\n" +
+                        "${parserResult.errors.joinToString("\n")}\n"
+            } + "Interpretation result: $interpretationResult"
+
+            outputSubject.onNext(output)
         } catch (e: Exception) {
             errorSubject.onError(e)
         }

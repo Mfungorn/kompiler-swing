@@ -4,7 +4,7 @@ import domain.interpreter.Interpreter
 import domain.lexer.Lexer
 import domain.parser.Parser
 import org.koin.dsl.module
-import presentation.main.MainViewController
+import presentation.main.MainViewModel
 import service.FileService
 
 val appModule = module {
@@ -13,5 +13,5 @@ val appModule = module {
     single { Parser() }
     single { Interpreter() }
 
-    single { MainViewController(get(), get(), get(), get()) }
+    single { MainViewModel(get(), get(), get(), get()) }
 }
