@@ -92,7 +92,10 @@ class Parser {
 
         return if (next in COMPARISON_OPERATORS) {
             firstAResult.restTokens.toResult(errors = errors)
-                .a(isComparisonOperand = true)
+                .a(
+                    isComparisonOperand = true,
+                    isAfterComparison = true
+                )
                 .let {
                     it.copy(
                         tokens = firstAResult.tokens + next + it.tokens,
@@ -100,15 +103,18 @@ class Parser {
                     )
                 }
         } else { // Neutralization
-            firstAResult.restTokens.toResult(
-                firstAResult.tokens + Operator.Equals + Operand("0"),
-                errors + "Missing condition"
+            firstAResult.copy(
+                tokens = firstAResult.tokens + Operator.Equals + Operand("0"),
+                errors = errors + "Missing condition: (${currentToken.line}, ${currentToken.index + 1})"
             )
         }
     }
 
     // A -> AoA | i
-    private fun Result.a(isComparisonOperand: Boolean = false): Result = if (restTokens.isNotEmpty()) {
+    private fun Result.a(
+        isComparisonOperand: Boolean = false,
+        isAfterComparison: Boolean = false
+    ): Result = if (restTokens.isNotEmpty()) {
         when (val next = restTokens.first()) {
             in ARITHMETIC_OPERATORS -> {
                 restTokens
@@ -128,7 +134,16 @@ class Parser {
             in COMPARISON_OPERATORS, in BOOLEAN_OPERATORS -> restTokens.toResult(listOf(currentToken), errors)
             is Operand -> { // Neutralization
                 if (isComparisonOperand) {
-                    restTokens.toResult(listOf(currentToken), errors)
+                    if (isAfterComparison) {
+                        restTokens.toResult(listOf(currentToken), errors)
+                    } else {
+                        restTokens
+                            .takeLast(restTokens.size - 1)
+                            .toResult(
+                                listOf(next),
+                                errors + "Missing operator: (${currentToken.line}, ${currentToken.index - 1})"
+                            )
+                    }
                 } else {
                     restTokens
                         .takeLast(restTokens.size - 1)
