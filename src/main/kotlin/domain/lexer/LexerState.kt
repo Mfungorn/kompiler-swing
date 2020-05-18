@@ -42,7 +42,10 @@ sealed class LexerState(
             }
             'F' -> {
                 if (start == "I") {
-                    tokens.add(If)
+                    tokens.add(If.also {
+                        it.line = action.line
+                        it.index = action.index
+                    })
                     ConditionReadState(tokens, errors)
                 } else {
                     errors.add(
@@ -59,7 +62,10 @@ sealed class LexerState(
     class ConditionReadState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = action.char.operatorOrNull()
             ?.let {
-                tokens.add(it)
+                tokens.add(it.also { token ->
+                    token.line = action.line
+                    token.index = action.index
+                })
                 ConditionReadState(tokens, errors)
             }
             ?: when {
@@ -92,10 +98,16 @@ sealed class LexerState(
         private val start: String
     ) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = if (action.char == '=') {
-            tokens.add(Operator.Equals)
+            tokens.add(Operator.Equals.also {
+                it.line = action.line
+                it.index = action.index
+            })
             ConditionReadState(tokens, errors)
         } else {
-            tokens.add(Operator.Equals)
+            tokens.add(Operator.Equals.also {
+                it.line = action.line
+                it.index = action.index
+            })
             errors.add(
                 "Lexical error: Expected '==', but got ${start + action.char}: (${action.line},${action.index})"
             )
@@ -111,13 +123,22 @@ sealed class LexerState(
     ) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = action.char.operatorOrNull()
             ?.let {
-                tokens.add(Operand(identifier))
-                tokens.add(it)
+                tokens.add(Operand(identifier).also { ident ->
+                    ident.line = action.line
+                    ident.index = action.index
+                })
+                tokens.add(it.also { token ->
+                    token.line = action.line
+                    token.index = action.index
+                })
                 contextState
             }
             ?: when {
                 action.char.isWhitespace() -> {
-                    tokens.add(Operand(identifier))
+                    tokens.add(Operand(identifier).also {
+                        it.line = action.line
+                        it.index = action.index
+                    })
                     contextState
                 }
                 action.char.isDigit() -> IntegerIdentifierReadState(
@@ -130,7 +151,10 @@ sealed class LexerState(
                     contextState
                 )
                 action.char.isLetter() -> {
-                    tokens.add(Operand(identifier))
+                    tokens.add(Operand(identifier).also {
+                        it.line = action.line
+                        it.index = action.index
+                    })
                     errors.add(
                         "Lexical error: " +
                                 "Invalid identifier name '${identifier + action.char}' " +
@@ -139,11 +163,17 @@ sealed class LexerState(
                     contextState
                 }
                 action.char == '=' -> {
-                    tokens.add(Operand(identifier))
+                    tokens.add(Operand(identifier).also {
+                        it.line = action.line
+                        it.index = action.index
+                    })
                     EqualsOperatorReadState(tokens, errors, "=")
                 }
                 action.char == Lexer.EOF -> {
-                    tokens.add(Operand(identifier))
+                    tokens.add(Operand(identifier).also {
+                        it.line = action.line
+                        it.index = action.index
+                    })
                     contextState.consumeEmit(action)
                 }
                 else -> {
@@ -203,16 +233,25 @@ sealed class LexerState(
             ?.let { operator ->
                 val state = resolveIdentifier(identifier.toUpperCase()) { token ->
                     if (token != null)
-                        tokens.add(token)
+                        tokens.add(token.also {
+                            it.line = action.line
+                            it.index = action.index
+                        })
                 }
-                tokens.add(operator)
+                tokens.add(operator.also {
+                    it.line = action.line
+                    it.index = action.index
+                })
                 state
             }
             ?: when {
                 action.char.isWhitespace() -> {
                     resolveIdentifier(identifier.toUpperCase()) { token ->
                         if (token != null)
-                            tokens.add(token)
+                            tokens.add(token.also {
+                                it.line = action.line
+                                it.index = action.index
+                            })
                     }
                 }
                 action.char.isLetterOrDigit() || action.char == '_' -> LiteralIdentifierReadState(
@@ -224,7 +263,10 @@ sealed class LexerState(
                 action.char == Lexer.EOF -> {
                     resolveIdentifier(identifier.toUpperCase()) { token ->
                         if (token != null)
-                            tokens.add(token)
+                            tokens.add(token.also {
+                                it.line = action.line
+                                it.index = action.index
+                            })
                     }
                     contextState.consumeEmit(action)
                 }
@@ -246,10 +288,16 @@ sealed class LexerState(
             'I' -> EndIfReadState(tokens, errors, "END I")
             'F' -> {
                 if (start == "END I") {
-                    tokens.add(EndIf)
+                    tokens.add(EndIf.also {
+                        it.line = action.line
+                        it.index = action.index
+                    })
                     TerminalState(tokens, errors)
                 } else {
-                    tokens.add(EndIf)
+                    tokens.add(EndIf.also {
+                        it.line = action.line
+                        it.index = action.index
+                    })
                     errors.add("Lexical error: Expected 'END IF', but got ${start + "F"}: (${action.line},${action.index})")
                     TerminalState(tokens, errors)
                 }
@@ -265,7 +313,10 @@ sealed class LexerState(
     class StatementReadState(tokens: MutableList<Token>, errors: MutableList<String>) : LexerState(tokens, errors) {
         override fun consumeEmit(action: LexerAction.EmitChar): LexerState = action.char.operatorOrNull()
             ?.let {
-                tokens.add(it)
+                tokens.add(it.also { token ->
+                    token.line = action.line
+                    token.index = action.index
+                })
                 StatementReadState(tokens, errors)
             }
             ?: when {

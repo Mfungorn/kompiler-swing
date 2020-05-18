@@ -25,7 +25,7 @@ class Parser {
     } else {
         this.copy(
             tokens = listOf(If),
-            errors = errors + "Missing IF"
+            errors = errors + "Missing IF: (0, 0)"
         )
     }
 
@@ -34,20 +34,28 @@ class Parser {
     } else { // Neutralization
         this.copy(
             tokens = tokens + Then,
-            errors = errors + "Missing THEN"
+            errors = errors + "Missing THEN: (${currentToken.line}, ${currentToken.index - 1})"
         )
     }
 
     private fun Result.`else`(): Result = if (currentToken is Else) {
         restTokens.toResult(tokens + currentToken, errors)
     } else {
-        restTokens.toResult(tokens + currentToken, errors + "Missing ELSE")
+        restTokens.toResult(
+            tokens + currentToken,
+            errors + "Missing ELSE: (${currentToken.line}, ${currentToken.index - 1})"
+        )
     }
 
     private fun Result.endIf(): Result = if (currentToken is EndIf) {
         Result(currentToken, emptyList(), tokens + currentToken, errors)
     } else {
-        Result(currentToken, emptyList(), tokens + EndIf, errors + "Missing END IF")
+        Result(
+            currentToken,
+            emptyList(),
+            tokens + EndIf,
+            errors + "Missing END IF: (${currentToken.line}, ${currentToken.index + 1})"
+        )
     }
 
     // B -> CbB | C
@@ -124,7 +132,10 @@ class Parser {
                 } else {
                     restTokens
                         .takeLast(restTokens.size - 1)
-                        .toResult(tokens + currentToken + Else + next, errors + "Missing ELSE")
+                        .toResult(
+                            tokens + currentToken + Else + next,
+                            errors + "Missing ELSE: (${currentToken.line}, ${currentToken.index + 1})"
+                        )
                 }
             }
             else -> restTokens.toResult(tokens + currentToken, errors)
