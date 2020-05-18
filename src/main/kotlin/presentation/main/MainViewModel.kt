@@ -4,7 +4,7 @@ import domain.interpreter.Interpreter
 import domain.lexer.Lexer
 import domain.parser.Parser
 import io.reactivex.rxjava3.core.Observable
-import io.reactivex.rxjava3.subjects.BehaviorSubject
+import io.reactivex.rxjava3.subjects.PublishSubject
 import service.FileService
 import utils.formatToString
 import java.awt.Component
@@ -16,10 +16,10 @@ class MainViewModel(
     private val parser: Parser,
     private val interpreter: Interpreter
 ) {
-    private val errorSubject: BehaviorSubject<Throwable> = BehaviorSubject.create()
-    val errorObservable: Observable<Throwable> = errorSubject
+    private val errorSubject: PublishSubject<String> = PublishSubject.create()
+    val errorObservable: Observable<String> = errorSubject
 
-    private val outputSubject: BehaviorSubject<String> = BehaviorSubject.create()
+    private val outputSubject: PublishSubject<String> = PublishSubject.create()
     val outputObservable: Observable<String> = outputSubject
 
     val fileServiceEventsObservable: Observable<FileService.FileServiceEvent> = Observable.create {
@@ -35,28 +35,39 @@ class MainViewModel(
 
     fun test(input: String) {
         try {
-            val lexerResult = lexer.analyze(input)
+            lexer.analyze(input)
+        } catch (e: Throwable) {
+            errorSubject.onNext("Error during Lexical analyzing: ${e.localizedMessage}")
+            null
+        }?.let { lexerResult ->
+            try {
+                parser.analyze(lexerResult.tokens, lexerResult.errors)
+            } catch (e: Throwable) {
+                errorSubject.onNext("Error during parsing: ${e.localizedMessage}")
+                null
+            }?.let { parserResult ->
+                val interpretationResult = try {
+                    interpreter
+                        .interpret(parserResult.tokens)
+                        .interpret()
+                        .value
+                } catch (e: Throwable) {
+                    errorSubject.onNext("Cannot interpret parsed tokens: ${e.localizedMessage}")
+                    null
+                }
 
-            val parserResult = parser.analyze(lexerResult.tokens, lexerResult.errors)
+                val output: String = if (parserResult.errors.isEmpty()) {
+                    "${parserResult.tokens.formatToString()}\n" +
+                            "\nNo errors\n"
+                } else {
+                    "Corrected code:\n" +
+                            "${parserResult.tokens.formatToString()}\n" +
+                            "\nErrors:\n" +
+                            "${parserResult.errors.joinToString("\n")}\n"
+                } + "Interpretation result: $interpretationResult"
 
-            val interpretationResult = interpreter
-                .interpret(parserResult.tokens)
-                .interpret()
-                .value
-
-            val output: String = if (parserResult.errors.isEmpty()) {
-                "${parserResult.tokens.formatToString()}\n" +
-                        "\nNo errors\n"
-            } else {
-                "Corrected code:\n" +
-                        "${parserResult.tokens.formatToString()}\n" +
-                        "\nErrors:\n" +
-                        "${parserResult.errors.joinToString("\n")}\n"
-            } + "Interpretation result: $interpretationResult"
-
-            outputSubject.onNext(output)
-        } catch (e: Exception) {
-            errorSubject.onError(e)
+                outputSubject.onNext(output)
+            }
         }
     }
 
@@ -64,7 +75,7 @@ class MainViewModel(
         return try {
             fileService.createFile(filename, ownerWindow)?.readText()
         } catch (e: IOException) {
-            errorSubject.onNext(e)
+            errorSubject.onNext(e.localizedMessage)
             null
         }
     }
@@ -73,7 +84,7 @@ class MainViewModel(
         return try {
             fileService.openFile(ownerWindow)?.readText()
         } catch (e: IOException) {
-            errorSubject.onNext(e)
+            errorSubject.onNext(e.localizedMessage)
             null
         }
     }
@@ -82,7 +93,7 @@ class MainViewModel(
         try {
             fileService.saveToFile(data, onFileNameMissed)
         } catch (e: IOException) {
-            errorSubject.onNext(e)
+            errorSubject.onNext(e.localizedMessage)
         }
     }
 
@@ -90,7 +101,7 @@ class MainViewModel(
         try {
             fileService.saveFileAs(filename, data, ownerWindow)
         } catch (e: IOException) {
-            errorSubject.onNext(e)
+            errorSubject.onNext(e.localizedMessage)
         }
     }
 }

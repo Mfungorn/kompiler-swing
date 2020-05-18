@@ -372,14 +372,10 @@ class MainView : JFrame(), KoinComponent {
             }
 
         mainViewModel.outputObservable
-            .subscribe {
-                outputTextArea.text = it
-            }
+            .subscribe { outputTextArea.text = it }
 
         mainViewModel.errorObservable
-            .subscribe {
-                showErrorDialog(content = it.localizedMessage)
-            }
+            .subscribe { showErrorDialog(content = it) }
     }
 
     private fun createFile() {
